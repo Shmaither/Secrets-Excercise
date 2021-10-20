@@ -1,10 +1,11 @@
 // dotenv is require for using environment variables from an .env file
 import dotenv from "dotenv";
 import express from "express";
-import bodyParser from "body-parser";
 import ejs from "ejs";
 import mongoose from "mongoose";
-import md5 from "md5";
+import bcrypt from "bcrypt";
+
+const saltRounds = 10;
 
 dotenv.config()
 const app = express();
@@ -37,33 +38,40 @@ app.get("/register", (req, res) => {
 });
 
 app.post("/register", (req, res) => {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password)
+
+  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash
+    });
+  
+    newUser.save((err) => {
+      (err) ? console.error(err) : res.render("secrets");
+    });
   });
 
-  newUser.save((err) => {
-    (err) ? console.error(err) : res.render("secrets");
-  });
 });
 
-app.post("/login", async (req, res) => {
+app.post("/login", (req, res) => {
   const username = req.body.username;
-  const password = md5(req.body.password);
-  let foundUser = {};
+  const password = req.body.password; 
 
-  try {
-    foundUser = await User.findOne({email: username})
-  } catch (err) {
-    console.error(err);
-  }
-
-  if (foundUser) {
-    if (foundUser.password === password) {
-      res.render("secrets");
+  User.findOne({email: username}, (err, foundUser) => {
+    if (err) {
+      console.log(err);
+    } else {
+      if (foundUser) {
+        // Load hash from your password DB.
+        bcrypt.compare(password, foundUser.password, (err, result) => {
+          if (!err && result) {
+            res.render("secrets");
+          } else {
+            console.log(err);
+          } 
+        });
+      }
     }
-  }
-
+  });
 });
 
 app.listen(3000, () => {
