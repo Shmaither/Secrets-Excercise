@@ -1,17 +1,18 @@
-
 // dotenv is require for using environment variables from an .env file
-require('dotenv').config()
-const express = require("express");
-const bodyParser = require("body-parser");
-const ejs = require("ejs");
-const mongoose = require("mongoose");
-const md5 = require("md5");
+import dotenv from "dotenv";
+import express from "express";
+import bodyParser from "body-parser";
+import ejs from "ejs";
+import mongoose from "mongoose";
+import md5 from "md5";
 
+dotenv.config()
 const app = express();
 
 app.use(express.static("public"));
 app.set('view engine', 'ejs');
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(express.json()); //Used to parse JSON bodies
+app.use(express.urlencoded({extended: true}));  //Parse URL-encoded bodies
 
 mongoose.connect("mongodb://localhost:27017/userDB");
 
