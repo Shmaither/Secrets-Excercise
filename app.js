@@ -1,79 +1,105 @@
-// dotenv is require for using environment variables from an .env file
-import dotenv from "dotenv";
-import express from "express";
-import ejs from "ejs";
-import mongoose from "mongoose";
-import bcrypt from "bcrypt";
+const express = require("express");
+const ejs = require("ejs");
+const mongoose = require("mongoose");
+const session = require("express-session");
+const passport = require("passport");
+const passportLocalMongoose = require("passport-local-mongoose");
 
-const saltRounds = 10;
-
-dotenv.config()
 const app = express();
 
 app.use(express.static("public"));
-app.set('view engine', 'ejs');
+app.set("view engine", "ejs");
 app.use(express.json()); //Used to parse JSON bodies
-app.use(express.urlencoded({extended: true}));  //Parse URL-encoded bodies
+app.use(express.urlencoded({ extended: true })); //Parse URL-encoded bodies
+
+// 1. use and set up the session imported from express-session
+app.use(
+  session({
+    secret: "Our little secret.",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
+// 2. initialize passport and that deal with the session.
+app.use(passport.initialize());
+app.use(passport.session());
 
 mongoose.connect("mongodb://localhost:27017/userDB");
 
 const userSchema = new mongoose.Schema({
   email: String,
-  password: String
+  password: String,
 });
 
+// 3.
+userSchema.plugin(passportLocalMongoose);
 
 const User = new mongoose.model("User", userSchema);
 
+/// 4.
+passport.use(User.createStrategy());
+
+// 5.
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 app.get("/", (req, res) => {
-  res.render("home")
+  res.render("home");
 });
 
 app.get("/login", (req, res) => {
-  res.render("login")
+  res.render("login");
 });
 
 app.get("/register", (req, res) => {
-  res.render("register")
+  res.render("register");
+});
+
+app.get("/secrets", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.render("secrets");
+  } else {
+    res.redirect("/login");
+  }
+});
+
+app.get("/logout", (req, res) => {
+  req.logout();
+  res.redirect("/");
 });
 
 app.post("/register", (req, res) => {
-
-  bcrypt.hash(req.body.password, saltRounds, (err, hash) => {
-    const newUser = new User({
-      email: req.body.username,
-      password: hash
-    });
-  
-    newUser.save((err) => {
-      (err) ? console.error(err) : res.render("secrets");
-    });
-  });
-
-});
-
-app.post("/login", (req, res) => {
-  const username = req.body.username;
-  const password = req.body.password; 
-
-  User.findOne({email: username}, (err, foundUser) => {
-    if (err) {
-      console.log(err);
-    } else {
-      if (foundUser) {
-        // Load hash from your password DB.
-        bcrypt.compare(password, foundUser.password, (err, result) => {
-          if (!err && result) {
-            res.render("secrets");
-          } else {
-            console.log(err);
-          } 
+  User.register(
+    { username: req.body.username },
+    req.body.password,
+    (err, user) => {
+      if (err) {
+        console.log(err);
+        res.redirect("/register");
+      } else {
+        passport.authenticate("local")(req, res, () => {
+          res.redirect("/secrets");
         });
       }
     }
-  });
+  );
 });
+
+app.post(
+  "/login",
+  passport.authenticate("local", { failureRedirect: "/login" }),
+  (req, res) => {
+    res.redirect("/secrets");
+  }
+);
 
 app.listen(3000, () => {
   console.log("Server started on port 3000");
 });
+
+// FOR USING PASSPORT AUTHENTICATION YOU'LL NEE TO INTALL:
+// npm i passport
+// npm i passport-local
+// npm i passport-local-mongoose
+// npm i express-session
